@@ -25,14 +25,14 @@ import seaborn as sns
 # Using os.path.join() to create system-independent paths
 import os
 
-# Defining where our data is located (for more than one folders, using a list)
-DATA_FOLDER = ["..", "input"]
+# Defining where our data is located (for more than one folders, use a list)
+DATA_FOLDER = "data"
 TRAIN_FILE = "train.csv"
 TEST_FILE = "test.csv"
 
 # Creating file paths
-train_path = os.path.join(*DATA_FOLDER, TRAIN_FILE)
-test_path = os.path.join(*DATA_FOLDER, TEST_FILE)
+train_path = os.path.join(DATA_FOLDER, TRAIN_FILE)
+test_path = os.path.join(DATA_FOLDER, TEST_FILE)
 
 # Loading data with pandas (parsing date columns appropriately)
 train_df = pd.read_csv(train_path, parse_dates=["release_date"])
@@ -42,7 +42,25 @@ with pd.option_context("display.max_columns", None):
     display(train_df.head())
 
 # Printing shape and columns of the data
-print(train_df.shape)
-print(train_df.columns)
+print("There are " + str(train_df.shape[0]) + " observations and " + str(train_df.shape[1]) + " features (including the response).")
+print("Columns are: ")
+for col in train_df.columns:
+    print(col)
+
+#%% [markdown]
+# So our dataset is composed of 3000 observations (id of the predictions will start from 3001, so we'll define it next).
+#
+# #### Dropping useless columns
+#
+# We can easily guess that the columns *id*, *title*, *homepage*, *imdb_id*, *original_title*, *overview*, *poster_path* and *tagline* won't contribute to our prediction as they don't explain any variance of the dataset, being just additional informations. Therefore, they will be dropped.
+
 
 #%%
+cols_to_drop = ["id", "title", "homepage", "imdb_id", "original_title", "overview", "poster_path", "tagline"]
+
+train_df = train_df.drop(cols_to_drop, axis=1)
+test_df = test_df.drop(cols_to_drop, axis=1)
+
+# Displaying converted data
+with pd.option_context("display.max_columns", None):
+    display(train_df.head())

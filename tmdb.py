@@ -120,8 +120,11 @@ enc = OneHotEncoder(handle_unknown="ignore")
 train_df["status"] = train_df["status"].apply(lambda x: 1 if x == "Released" else 0)
 test_df["status"] = test_df["status"].apply(lambda x: 1 if x == "Released" else 0)
 
-train_df["release_date"] = train_df["release_date"].apply(lambda x: x.timestamp())
-test_df["release_date"] = test_df["release_date"].apply(lambda x: x.timestamp())
+train_df["release_date"] = train_df["release_date"].apply(lambda x: pd.to_datetime(x).timestamp() if type(x) is "str" else 0)
+test_df["release_date"] = test_df["release_date"].apply(lambda x: pd.to_datetime(x).timestamp() if type(x) is "str" else 0)
+
+with pd.option_context("display.max_columns", None):
+    display(train_df.head())
 
 enc.fit(train_df)
 
@@ -130,3 +133,6 @@ enc.transform(test_df)
 
 with pd.option_context("display.max_columns", None):
     display(train_df.head())
+
+
+#%%

@@ -40,16 +40,27 @@ test_df = pd.read_csv(test_path, parse_dates=["release_date"])
 
 with pd.option_context("display.max_columns", None):
     display(train_df.head())
+    display(test_df.head())
 
-# Printing shape and columns of the data
-print("There are " + str(train_df.shape[0]) + " observations and " + str(train_df.shape[1]) + " features (including the response).")
-print("Columns are: ")
+#%% [markdown]
+# #### Shape of the data
+# Let's now print the number of observations and features of our datasets
+
+#%%
+print(train_df.shape)
+print(test_df.shape)
+
+#%% [markdown]
+# Now let's see the explanatory variables.
+
+#%%
 for col in train_df.columns:
     print(col)
 
 #%% [markdown]
 # So our dataset is composed of 3000 observations (id of the predictions will start from 3001, so we'll define it next).
-#
+
+#%% [markdown]
 # #### Dropping useless columns
 #
 # We gues that features like *popularity* are very descriptive of the variance in the response.
@@ -67,13 +78,14 @@ test_df = test_df.drop(cols_to_drop, axis=1)
 # Displaying converted data
 with pd.option_context("display.max_columns", None):
     display(train_df.head())
+    display(test_df.head())
 
 #%% [markdown]
 # #### Transforming columns whose elements are dict
 #
 # Some columns have dicts as values. Such dicts contains different informations, but we want to just retain the identifying one (in most, this is the *name*). For this reason, we are going to map these column values to the extracted name from the dicts.
 #
-# For such objective, we will use `pandas`'s method `map()`. We map to the *name* value of the dicts of the column *genres*. For *spoken_languages*, we will map to the keys *iso_639_1*'s values.
+# For such objective, we will use `pandas`'s method `map()`.
 #
 # Some features contain a single dict, others multiple dict: the former will be mapped to a string with the single name, the latter to the string representation of the list of names, and we will process them further in next steps.
 #
@@ -82,21 +94,65 @@ with pd.option_context("display.max_columns", None):
 #%%
 import ast
 
+def parse_name(x):
+    '''
+    This function will parse the "name" property in the relative dict or list of dicts. 
+    Returns either a string containing the name or a string representation of a list of all names.
+    '''
+
+    if x != "None":
+        ls = ast.literal_eval(x)
+    else:
+        return "None"
+    
+    if len(ls) == 1:
+        return ls[0]["name"]
+    else:
+        return str([d["name"] for d in ls])
+
+def parse_iso(x):
+    '''
+    This function will parse the "iso_*" property in the relative dict or list of dicts. 
+    Returns either a string containing the name or a string representation of a list of all iso_*.
+    '''
+
+    if x != "None":
+        ls = ast.literal_eval(x)
+    else:
+        return "None"
+
+    if len(ls) == 1:
+        return list(ls[0].values())[0]
+    else:
+        return str([list(d.values())[0] for d in ls])
+
+# Selecting categorical and numerical columns
+cat_cols = train_df.select_dtypes(exclude="number").columns
+num_cols = train_df.select_dtypes("number").columns
+
+# Saving categorical and numerical columns
 train_df[cat_cols] = train_df[cat_cols].fillna("None")
 test_df[cat_cols] = test_df[cat_cols].fillna("None")
 
-train_df["genres"] = train_df["genres"].apply(lambda x: ast.literal_eval(x)[0]["name"] if x != "None" else "None")
-test_df["genres"] = test_df["genres"].apply(lambda x: ast.literal_eval(x)[0]["name"] if x != "None" else "None")
+for cat in ["belongs_to_collection", "genres", "production_companies", "Keywords", "cast", "crew"]:
+    train_df[cat] = train_df[cat].map(parse_name)
+    test_df[cat] = test_df[cat].map(parse_name)
 
-train_df["spoken_languages"] = train_df["spoken_languages"].apply(lambda x: ast.literal_eval(x)[0]["iso_639_1"] if x != "None" else "None")
-test_df["spoken_languages"] = test_df["spoken_languages"].apply(lambda x: ast.literal_eval(x)[0]["iso_639_1"] if x != "None" else "None")
+for cat in ["production_countries", "spoken_languages"]:
+    train_df[cat] = train_df[cat].map(parse_iso)
+    test_df[cat] = test_df[cat].map(parse_iso)
 
 # Displaying converted data
 with pd.option_context("display.max_columns", None):
     display(train_df.head())
+    display(test_df.head())
 
 #%% [markdown]
-# 
-
+# #### Statistics about the data
+# We can see that we have categories that span into lots of classes. What should we do about them?
+#
+# Let's plot an histogram, and try to understand the frequency at which they appear.
+#
+# First, we need to stack the dataframes (by dropping in the first one the response variable) in order to cumulatively see the class distributions.
 
 #%%

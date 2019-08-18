@@ -15,6 +15,8 @@
 # ## Exploratory Data Analysis
 #
 # Without further ado, let's first view the dataset, print out the predictors columns and try to get the first insight of the data.
+#
+# Before reading the csv with pandas, we save the file with encoding "utf-8".
 
 #%%
 import numpy as np 
@@ -35,8 +37,8 @@ train_path = os.path.join(DATA_FOLDER, TRAIN_FILE)
 test_path = os.path.join(DATA_FOLDER, TEST_FILE)
 
 # Loading data with pandas (parsing date columns appropriately)
-train_df = pd.read_csv(train_path, parse_dates=["release_date"])
-test_df = pd.read_csv(test_path, parse_dates=["release_date"])
+train_df = pd.read_csv(train_path, parse_dates=["release_date"], encoding="utf-8", low_memory=False)
+test_df = pd.read_csv(test_path, parse_dates=["release_date"], encoding="utf-8", low_memory=False)
 
 with pd.option_context("display.max_columns", None):
     display(train_df.head())
@@ -93,6 +95,8 @@ with pd.option_context("display.max_columns", None):
 
 #%%
 import ast
+# Using json.dumps() to have string with "" in our lists
+import json
 
 def parse_name(x):
     '''
@@ -108,7 +112,7 @@ def parse_name(x):
     if len(ls) == 1:
         return ls[0]["name"]
     else:
-        return str([d["name"] for d in ls])
+        return json.dumps([d["name"] for d in ls])
 
 def parse_iso(x):
     '''
@@ -127,7 +131,7 @@ def parse_iso(x):
         return str([list(d.values())[0] for d in ls])
 
 # Selecting categorical and numerical columns
-cat_cols = train_df.select_dtypes(exclude="number").columns
+cat_cols = train_df.select_dtypes(exclude=["number", "datetime"]).columns
 num_cols = train_df.select_dtypes("number").columns
 
 # Saving categorical and numerical columns
@@ -148,11 +152,64 @@ with pd.option_context("display.max_columns", None):
     display(test_df.head())
 
 #%% [markdown]
+# #### Reducing multiple occurrences in the lists and turn lists with just one element to strings.
+
+#%%
+def unique_vals(x):
+    if not x.startswith("[\""):
+        return x 
+    else:
+        ls = ast.literal_eval(x)
+        uniq = list(set(ls))
+        if (len(uniq) == 1):
+            print(uniq[0])
+            return uniq[0]
+        else:
+            return json.dumps(uniq)
+
+for cat in cat_cols:
+    print(cat)
+    train_df[cat] = train_df[cat].map(unique_vals)
+    test_df[cat] = test_df[cat].map(unique_vals)
+
+# Displaying converted data
+with pd.option_context("display.max_columns", None):
+    display(train_df.head())
+    display(test_df.head())
+
+#%% [markdown]
 # #### Statistics about the data
 # We can see that we have categories that span into lots of classes. What should we do about them?
 #
-# Let's plot an histogram, and try to understand the frequency at which they appear.
-#
 # First, we need to stack the dataframes (by dropping in the first one the response variable) in order to cumulatively see the class distributions.
+#
+# Then, for each actor, we count the number of movies he starred in. And we describe a pandas series so that we can get all the statistical informations we need to classify an actor as popular or unpopular.
+#
+# The crew feature will become "n of popular actors", where we specify the number of popular actors starring in that movie, where popular means that an actor has taken part in a number of movies more than a threshold.
 
 #%%
+# Concatenating the two dataframes
+merged_df = pd.concat([train_df.drop("revenue", axis=1), test_df], ignore_index=True, sort=False)
+
+actor_dict = {}
+n_movies = merged_df.shape[0]
+
+for val in merged_df["cast"]:
+    if val.startswith("[\""):
+        val_ls = [n for n in ast.literal_eval(val)]
+    else:
+        val_ls = [val]
+
+    for e in val_ls:
+        if e in actor_dict.keys():
+            actor_dict[e] += 1
+        else:
+            actor_dict[e] = 1
+
+actor_freq = pd.Series(actor_dict)
+
+actor_freq.describe()
+
+#%% [markdown]
+# We can see that there are only a few actors that appeared 
+#

@@ -37,8 +37,8 @@ train_path = os.path.join(DATA_FOLDER, TRAIN_FILE)
 test_path = os.path.join(DATA_FOLDER, TEST_FILE)
 
 # Loading data with pandas (parsing date columns appropriately)
-train_df = pd.read_csv(train_path, parse_dates=["release_date"], encoding="utf-8", low_memory=False)
-test_df = pd.read_csv(test_path, parse_dates=["release_date"], encoding="utf-8", low_memory=False)
+train_df = pd.read_csv(train_path, parse_dates=["release_date"], encoding="utf-8")
+test_df = pd.read_csv(test_path, parse_dates=["release_date"], encoding="utf-8")
 
 with pd.option_context("display.max_columns", None):
     display(train_df.head())
@@ -186,6 +186,8 @@ with pd.option_context("display.max_columns", None):
 # Then, for each actor, we count the number of movies he starred in. And we describe a pandas series so that we can get all the statistical informations we need to classify an actor as popular or unpopular.
 #
 # The crew feature will become "n of popular actors", where we specify the number of popular actors starring in that movie, where popular means that an actor has taken part in a number of movies more than a threshold.
+#
+# We choose a popularity threshold equal to the mean plus three times the standard deviation of the dataset, and we ceil it to the nearest greater integer.
 
 #%%
 # Concatenating the two dataframes
@@ -206,10 +208,74 @@ for val in merged_df["cast"]:
         else:
             actor_dict[e] = 1
 
+# Series of frequencies of appearances of actors
 actor_freq = pd.Series(actor_dict)
 
+# Statistics about the above created series
 actor_freq.describe()
 
+# Setting the popularity threshold
+pop_threshold = np.ceil(actor_freq.mean() + 3 * actor_freq.std())
+
+# List of actors whose popularity meets the threshold
+pop_actors = actor_freq[actor_freq >= pop_threshold].index.tolist()
+
 #%% [markdown]
-# We can see that there are only a few actors that appeared 
+# We can see that there are only a few actors whose popularity is above our threshold.
 #
+# For each movie, we are going to count these popular actors, so that we can turn the category *crew* into a more useful feature, called *n_popular_actors*.
+
+#%%
+n_popular_actors_train = []
+n_popular_actors_test = []
+
+for act in train_df["cast"]:
+    n = 0
+    if act.startswith("[\""):
+        for e in ast.literal_eval(act):
+            if e in pop_actors:
+                n += 1
+    else:
+        if act in pop_actors:
+            n += 1
+
+    n_popular_actors_train.append(n)
+
+for act in test_df["cast"]:
+    n = 0
+    if act.startswith("[\""):
+        for e in ast.literal_eval(act):
+            if e in pop_actors:
+                n += 1
+    else:
+        if act in pop_actors:
+            n += 1
+
+    n_popular_actors_test.append(n)
+
+# Creating new column
+train_df = train_df.assign(n_popular_actors=pd.Series(n_popular_actors_train))  
+test_df = test_df.assign(n_popular_actors=pd.Series(n_popular_actors_test))  
+
+# Dropping crew column
+train_df = train_df.drop("crew", axis=1)
+test_df = test_df.drop("crew", axis=1)
+
+#%% [markdown]
+# Let's see how the new column is related to the response, to see if we made a good choice.
+
+#%%
+n_vs_pop = sns.scatterplot(x="n_popular_actors", y="revenue", data=train_df)
+plt.show()
+
+#%% [markdown]
+# We can see that, except an observation, the number of popular actors is positively correlated to the revenue of a movie.
+#
+# The other similiar columns, such as *Keywords*, *belongs_to_collection*, *production_companies* and so on, can be quantified using this popularity measure, since our objective here is not to make inferences but to predict the revenue.
+#
+# The *status* can be encoded in a binary way.
+
+#%%
+# Encoding binary column status
+train_df["status"] = train_df["status"].map(lambda x: 1 if x == "Released" else 0)
+test_df["status"] = test_df["status"].map(lambda x: 1 if x == "Released" else 0)
